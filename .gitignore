@@ -1,0 +1,3 @@
+*.o
+sop-backup
+Makefile
