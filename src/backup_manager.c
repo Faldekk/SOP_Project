@@ -12,6 +12,7 @@
 
 #define ERR(source) (perror(source), fprintf(stderr, "%s:%d\n", __FILE__, __LINE__), exit(EXIT_FAILURE))
 
+// creatin the manager struct thing
 backup_manager_t* create_backup_manager() {
     backup_manager_t *mgr = calloc(1, sizeof(backup_manager_t));
     if (!mgr)
@@ -24,10 +25,10 @@ backup_manager_t* create_backup_manager() {
     }
 
     mgr->head = NULL;
-    load_backup_state(mgr);
     return mgr;
 }
 
+// freein everything, dont forget to call this
 void destroy_backup_manager(backup_manager_t *mgr) {
     if (!mgr)
         return;
@@ -47,6 +48,7 @@ void destroy_backup_manager(backup_manager_t *mgr) {
     free(mgr);
 }
 
+// checcs if backup alredy exists in linked list
 static int backup_exists(backup_manager_t *mgr, const char *source, const char *target) {
     for (backup_entry_t *c = mgr->head; c; c = c->next) {
         if (strcmp(c->source_path, source) == 0 && strcmp(c->target_path, target) == 0)
@@ -55,6 +57,7 @@ static int backup_exists(backup_manager_t *mgr, const char *source, const char *
     return 0;
 }
 
+// addin new backup and startin worker proces with fork
 int add_backup(backup_manager_t *mgr, const char *source, const char *target) {
     if (!mgr || !source || !target)
         return -1;
@@ -82,7 +85,6 @@ int add_backup(backup_manager_t *mgr, const char *source, const char *target) {
         exit(EXIT_SUCCESS);
     } else if (pid > 0) {
         entry->worker_pid = pid;
-        save_backup_state(mgr);
         return 0;
     } else {
         ERR("fork - backup_manager.c");
@@ -90,6 +92,7 @@ int add_backup(backup_manager_t *mgr, const char *source, const char *target) {
     }
 }
 
+// killin worker and removin from list
 int remove_backup(backup_manager_t *mgr, const char *source, const char *target) {
     if (!mgr || !source || !target)
         return -1;
@@ -124,7 +127,6 @@ int remove_backup(backup_manager_t *mgr, const char *source, const char *target)
             free(cur->source_path);
             free(cur->target_path);
             free(cur);
-            save_backup_state(mgr);
             return 0;
         }
         prev = cur;
@@ -135,6 +137,7 @@ int remove_backup(backup_manager_t *mgr, const char *source, const char *target)
     return -1;
 }
 
+// printin all backups
 void list_backups(backup_manager_t *mgr) {
     if (!mgr)
         return;
@@ -150,77 +153,17 @@ void list_backups(backup_manager_t *mgr) {
     }
 }
 
+// killin all workers when exitin program
 void kill_all_workers(backup_manager_t *mgr) {
-    if (!mgr)
-        return;
+    if (!mgr) return;
 
     for (backup_entry_t *c = mgr->head; c; c = c->next) {
         if (c->worker_pid > 0) {
-            if (kill(c->worker_pid, SIGTERM) == -1) {
-                if (errno == ESRCH) {
-                    c->worker_pid = -1;
-                    continue;
-                }
-            }
-            
-            int status;
-            pid_t result = waitpid(c->worker_pid, &status, WNOHANG);
-            if (result == 0) {
-                usleep(200000);
-                result = waitpid(c->worker_pid, &status, WNOHANG);
-                if (result == 0) {
-                    usleep(300000);
-                    result = waitpid(c->worker_pid, &status, WNOHANG);
-                    if (result == 0) {
-                        fprintf(stderr, "Worker %d not responding, forcing kill\n", c->worker_pid);
-                        kill(c->worker_pid, SIGKILL);
-                        waitpid(c->worker_pid, &status, 0);
-                    }
-                }
-            }
+            kill(c->worker_pid, SIGTERM);
+            waitpid(c->worker_pid, NULL, 0);
             c->worker_pid = -1;
         }
         if (c->inotify_wd != -1 && mgr->inotify_fd != -1)
             inotify_rm_watch(mgr->inotify_fd, c->inotify_wd);
     }
-}
-
-void save_backup_state(backup_manager_t *mgr) {
-    if (!mgr) return;
-    
-    FILE *f = fopen("/tmp/sop-backup.state", "w");
-    if (!f) return;
-    
-    for (backup_entry_t *c = mgr->head; c; c = c->next) {
-        fprintf(f, "%d|%s|%s\n", c->worker_pid, c->source_path, c->target_path);
-    }
-    
-    fclose(f);
-}
-
-void load_backup_state(backup_manager_t *mgr) {
-    if (!mgr) return;
-    
-    FILE *f = fopen("/tmp/sop-backup.state", "r");
-    if (!f) return;
-    
-    char line[4096];
-    while (fgets(line, sizeof(line), f)) {
-        pid_t pid;
-        char source[2048], target[2048];
-        if (sscanf(line, "%d|%2047[^|]|%2047[^\n]", &pid, source, target) == 3) {
-            if (kill(pid, 0) == 0) {
-                backup_entry_t *entry = calloc(1, sizeof(backup_entry_t));
-                if (entry) {
-                    entry->source_path = strdup(source);
-                    entry->target_path = strdup(target);
-                    entry->worker_pid = pid;
-                    entry->inotify_wd = -1;
-                    entry->next = mgr->head;
-                    mgr->head = entry;
-                }
-            }
-        }
-    }
-    fclose(f);
 }

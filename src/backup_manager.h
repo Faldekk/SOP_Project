@@ -23,7 +23,5 @@ int add_backup(backup_manager_t *mgr, const char *source, const char *target);
 int remove_backup(backup_manager_t *mgr, const char *source, const char *target);
 void list_backups(backup_manager_t *mgr);
 void kill_all_workers(backup_manager_t *mgr);
-void save_backup_state(backup_manager_t *mgr);
-void load_backup_state(backup_manager_t *mgr);
 
 #endif

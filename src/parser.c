@@ -5,11 +5,13 @@
 #include <ctype.h>
 #include "parser.h"
 
+// helper for freein tokens array
 static void free_tokens(char **tokens, int cnt) {
     for (int i = 0; i < cnt; i++) free(tokens[i]);
     free(tokens);
 }
 
+// splitin line into tokens, handles quotes too
 static char** tokenize(const char *line, int *count) {
     if (!line || !count) return NULL;
     
@@ -62,6 +64,7 @@ static char** tokenize(const char *line, int *count) {
     return tokens;
 }
 
+// parsin source and target paths from tokens
 static int parse_paths(command_t *cmd, char **tokens, int cnt, int min_args, const char *name) {
     if (cnt < min_args) {
         fprintf(stderr, "Error: '%s' requires source and target path(s)\n", name);
@@ -75,6 +78,7 @@ static int parse_paths(command_t *cmd, char **tokens, int cnt, int min_args, con
     return 0;
 }
 
+// main parsin function, returns command struct
 command_t* parse_command(const char *line) {
     if (!line) return NULL;
     

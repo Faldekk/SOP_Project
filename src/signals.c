@@ -7,33 +7,14 @@
 #include "signals.h"
 #include "backup_manager.h"
 
+// handlin signals like ctrl+c
 static void signal_handler(int signo) {
+    (void)signo;
     should_exit = 1;
-    const char *msg = NULL;
-    
-    switch(signo) {
-        case SIGINT:
-            msg = "\nReceived SIGINT, shutting down...\n";
-            break;
-        case SIGTERM:
-            msg = "\nReceived SIGTERM, shutting down...\n";
-            break;
-        case SIGHUP:
-            msg = "\nReceived SIGHUP, shutting down...\n";
-            break;
-        case SIGQUIT:
-            msg = "\nReceived SIGQUIT, shutting down...\n";
-            break;
-        default:
-            msg = "\nReceived signal, shutting down...\n";
-            break;
-    }
-    
-    if (msg) {
-        write(STDERR_FILENO, msg, strlen(msg));
-    }
+    write(STDERR_FILENO, "\nShutting down...\n", 19);
 }
 
+// settin up all the signal handlers
 void setup_signal_handlers() {
     struct sigaction sa;
     memset(&sa, 0, sizeof(sa));
@@ -63,10 +44,11 @@ void setup_signal_handlers() {
     }
 }
 
+// cleanin up before exit
 void cleanup_on_exit(void *manager) {
     if (manager) {
         backup_manager_t *mgr = (backup_manager_t *)manager;
         kill_all_workers(mgr);
     }
-    fprintf(stdout, "Cleanup completed\n");
+    write(STDOUT_FILENO, "Cleanup completed. Exiting.\n", 29);
 }

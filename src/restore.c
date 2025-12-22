@@ -9,6 +9,7 @@
 #include <errno.h>
 #include "restore.h"
 
+// comparin files and copyin only if diferent
 int compare_and_copy_if_different(const char *src, const char *dst) {
     struct stat st_src, st_dst;
     
@@ -32,6 +33,7 @@ int compare_and_copy_if_different(const char *src, const char *dst) {
     return 0;
 }
 
+// makin sure directory exists, creates if not
 static int ensure_directory_exists(const char *path) {
     struct stat st;
     if (stat(path, &st) == 0) {
@@ -61,6 +63,7 @@ static int ensure_directory_exists(const char *path) {
     return 0;
 }
 
+// deletin files that dont exist in baccup anymore
 void delete_files_not_in_backup(const char *source, const char *target) {
     DIR *dir = opendir(source);
     if (!dir) {
@@ -107,6 +110,7 @@ void delete_files_not_in_backup(const char *source, const char *target) {
     closedir(dir);
 }
 
+// main restore function, copys baccup back to source
 int restore_backup(const char *source, const char *target) {
     if (ensure_directory_exists(target) == -1) {
         fprintf(stderr, "Failed to create target directory for restore: %s\n", target);

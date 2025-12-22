@@ -16,6 +16,7 @@
 
 #define FILE_BUF_LEN 65536
 
+// bulk read and write from lecture, dont touch this
 ssize_t bulk_read(int fd, char *buf, size_t count)
 {
     ssize_t c;
@@ -33,6 +34,8 @@ ssize_t bulk_read(int fd, char *buf, size_t count)
     } while (count > 0);
     return len;
 }
+
+// same as above but for writin
 ssize_t bulk_write(int fd, char *buf, size_t count)
 {
     ssize_t c;
@@ -49,6 +52,7 @@ ssize_t bulk_write(int fd, char *buf, size_t count)
     return len;
 }
 
+// copyin file from src to dst, also preservs the time
 int copy_file(const char* source_path, const char* dest_path)
 {
     struct stat source_stat;
@@ -94,147 +98,103 @@ int copy_file(const char* source_path, const char* dest_path)
     close(source_fd);
     close(dest_fd);
 
-    struct timeval times[2];
-    times[0].tv_sec = source_stat.st_atime;
-    times[0].tv_usec = 0;
-    times[1].tv_sec = source_stat.st_mtime;
-    times[1].tv_usec = 0;
+    // settin file times to match original
+    struct timeval times[2] = {
+        { source_stat.st_atime, 0 },
+        { source_stat.st_mtime, 0 }
+    };
     utimes(dest_path, times);
 
     return EXIT_SUCCESS;
 }
 
-
-int copy_symlink_smart(const char *path_src, const char *path_dst, const char *source_base, const char *target_base) {
+// copyin symlink, this was annoyin to make work
+int copy_symlink(const char *path_src, const char *path_dst, const char *source_base, const char *target_base) {
     char link_buf[PATH_MAX];
     ssize_t len = readlink(path_src, link_buf, PATH_MAX - 1);
-    
     if (len == -1) {
         perror("readlink");
         return EXIT_FAILURE;
     }
-    
     link_buf[len] = '\0';
     
+    // if link points to file in source, redirect to target
     if (link_buf[0] == '/') {
+        char *real_src = realpath(source_base, NULL);
+        char *real_tgt = realpath(target_base, NULL);
         
-        char *real_source_base = realpath(source_base, NULL);
-        char *real_target_base = realpath(target_base, NULL);
-        
-        if (real_source_base && real_target_base) {
-            size_t source_len = strlen(real_source_base);
-            if (strncmp(link_buf, real_source_base, source_len) == 0 &&
-                (link_buf[source_len] == '/' || link_buf[source_len] == '\0')) {
-                char new_path[PATH_MAX];
-                snprintf(new_path, PATH_MAX, "%s%s", real_target_base, link_buf + source_len);
-                free(real_source_base);
-                free(real_target_base);
-                if (symlink(new_path, path_dst) == -1) {
-                    perror("symlink");
-                    return EXIT_FAILURE;
-                }
-                return EXIT_SUCCESS;
+        if (real_src && real_tgt && strncmp(link_buf, real_src, strlen(real_src)) == 0) {
+            char new_path[PATH_MAX];
+            snprintf(new_path, PATH_MAX, "%s%s", real_tgt, link_buf + strlen(real_src));
+            free(real_src);
+            free(real_tgt);
+            if (symlink(new_path, path_dst) == -1) {
+                perror("symlink");
+                return EXIT_FAILURE;
             }
+            return EXIT_SUCCESS;
         }
-        free(real_source_base);
-        free(real_target_base);
-        
-        if (symlink(link_buf, path_dst) == -1) {
-            perror("symlink on src not absolute");
-            return EXIT_FAILURE;
-        }
-    } else {
-        if (symlink(link_buf, path_dst) == -1) {
-            perror("symlink on dst not absolute");
-            return EXIT_FAILURE;
-        }
+        free(real_src);
+        free(real_tgt);
     }
     
+    if (symlink(link_buf, path_dst) == -1) {
+        perror("symlink");
+        return EXIT_FAILURE;
+    }
     return EXIT_SUCCESS;
 }
 
+// checcs file type and calls correct copy function
 int copy_tree(const char* source_path, const char* dest_path, const char* source_base, const char* target_base) {
-    struct stat file_stat;
-    if (lstat(source_path, &file_stat) == -1) {
-        ERR("Failed to get file status");
+    struct stat st;
+    if (lstat(source_path, &st) == -1) {
+        ERR("lstat");
     }
 
-    if (S_ISREG(file_stat.st_mode)) {
-        if (copy_file(source_path, dest_path) == 0) {
-            return EXIT_SUCCESS;
-        } else {
-            ERR("Failed to copy file");
-        }
-    }
+    if (S_ISREG(st.st_mode))
+        return copy_file(source_path, dest_path);
+    
+    if (S_ISDIR(st.st_mode))
+        return copy_dir(source_path, dest_path, source_base, target_base);
+    
+    if (S_ISLNK(st.st_mode))
+        return copy_symlink(source_path, dest_path, source_base, target_base);
 
-    if (S_ISDIR(file_stat.st_mode)) {
-        if (copy_dir(source_path, dest_path, source_base, target_base) == 0) {
-            return EXIT_SUCCESS;
-        } else {
-            ERR("Failed to copy directory");
-        }
-    }
-
-    if (S_ISLNK(file_stat.st_mode)) {
-        if (copy_symlink_smart(source_path, dest_path, source_base, target_base) == 0) {
-            return EXIT_SUCCESS;
-        } else {
-            ERR("Failed to copy symbolic link");
-        }
-    }
-
-    if (S_ISFIFO(file_stat.st_mode) || S_ISSOCK(file_stat.st_mode) || S_ISBLK(file_stat.st_mode) || S_ISCHR(file_stat.st_mode)) {
-        fprintf(stderr, "Skipping special file: %s\n", source_path);
-        return EXIT_SUCCESS;
-    }
-
-    ERR("Unknown file type");
-    return EXIT_FAILURE;
+    // skipin special files like fifos and sockets
+    return EXIT_SUCCESS;
 }
+
+// copyin whole directory recursivly
 int copy_dir(const char* source_path, const char* dest_path, const char* source_base, const char* target_base) {
-    struct stat src_stat, dest_stat;
+    struct stat src_stat;
     if (lstat(source_path, &src_stat) == -1) {
-        ERR("Failed to get source directory info");
+        ERR("lstat");
     }
 
     mode_t old_umask = umask(0);
-    int mkdir_result = mkdir(dest_path, src_stat.st_mode & 0777);
+    int ret = mkdir(dest_path, src_stat.st_mode & 0777);
     umask(old_umask);
     
-    if (mkdir_result == -1) {
-        if (errno == EEXIST) {
-            if (lstat(dest_path, &dest_stat) == -1) {
-                ERR("Failed to check destination directory");
-            }
-            if (!S_ISDIR(dest_stat.st_mode)) {
-                ERR("Destination exists but is not a directory");
-            }
-        } else {
-            ERR("Failed to create destination directory");
-        }
+    if (ret == -1 && errno != EEXIST) {
+        ERR("mkdir");
     }
 
     DIR *dir = opendir(source_path);
     if (!dir) {
-        ERR("Failed to open source directory");
+        ERR("opendir");
     }
 
     struct dirent *entry;
-    char child_source[PATH_MAX];
-    char child_dest[PATH_MAX];
+    char child_src[PATH_MAX], child_dst[PATH_MAX];
 
     while ((entry = readdir(dir)) != NULL) {
-        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
             continue;
-        }
 
-        int result_s_path = snprintf(child_source, PATH_MAX, "%s/%s", source_path, entry->d_name);
-        int result_d_path = snprintf(child_dest, PATH_MAX, "%s/%s", dest_path, entry->d_name);
-
-        if (result_s_path < 0 || result_d_path < 0 || result_s_path >= PATH_MAX || result_d_path >= PATH_MAX) {
-            ERR("Failed to format paths");
-        }
-        copy_tree(child_source, child_dest, source_base, target_base);
+        snprintf(child_src, PATH_MAX, "%s/%s", source_path, entry->d_name);
+        snprintf(child_dst, PATH_MAX, "%s/%s", dest_path, entry->d_name);
+        copy_tree(child_src, child_dst, source_base, target_base);
     }
 
     closedir(dir);

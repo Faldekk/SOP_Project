@@ -14,6 +14,7 @@
 
 #define ERR(source) (perror(source), fprintf(stderr, "%s:%d\n", __FILE__, __LINE__), exit(EXIT_FAILURE))
 
+// linked list for storin watch descriptors
 typedef struct watch_node {
     int wd;
     char path[PATH_MAX];
@@ -22,6 +23,7 @@ typedef struct watch_node {
 
 static watch_node_t *watch_list = NULL;
 
+// findin path by watch descriptor
 static const char* find_watch_path(int wd) {
     for (watch_node_t *n = watch_list; n; n = n->next) {
         if (n->wd == wd){
@@ -31,6 +33,7 @@ static const char* find_watch_path(int wd) {
     return NULL;
 }
 
+// removin watch from list
 static void remove_watch_entry(int wd) {
     watch_node_t *prev = NULL, *cur = watch_list;
     while (cur) {
@@ -44,6 +47,7 @@ static void remove_watch_entry(int wd) {
     }
 }
 
+// addin inotify watch and storin in list
 static int register_watch(int inotify_fd, const char *path) {
     uint32_t mask = IN_CREATE | IN_MODIFY | IN_DELETE | IN_MOVED_FROM | IN_MOVED_TO | IN_CLOSE_WRITE;
 
@@ -69,6 +73,7 @@ static int register_watch(int inotify_fd, const char *path) {
     return wd;
 }
 
+// deletin path recursivly, for folders and files
 static int remove_path_recursive(const char *path) {
     struct stat st;
     if (lstat(path, &st) == -1) {
@@ -113,6 +118,7 @@ static int remove_path_recursive(const char *path) {
     return 0;
 }
 
+// creatin first baccup before startin monitor
 int create_initial_backup(const char *source, const char *target) {
     struct stat st;
     if (lstat(source, &st) == -1) {
@@ -157,15 +163,9 @@ int create_initial_backup(const char *source, const char *target) {
     
     free(real_source);
     
-    if (lstat(target, &st) == 0) {
-        if (!S_ISDIR(st.st_mode)) {
-            fprintf(stderr, "Error: Target '%s' exists but is not a directory\n", target);
-            return -1;
-        }
-        
-        if (is_directory_empty(target) == 0) {
-            fprintf(stdout, "Warning: Target directory '%s' is not empty, files may be overwritten\n", target);
-        }
+    if (lstat(target, &st) == 0 && !S_ISDIR(st.st_mode)) {
+        fprintf(stderr, "Error: Target '%s' exists but is not a directory\n", target);
+        return -1;
     }
     
     fprintf(stdout, "Creating initial backup from %s to %s...\n", source, target);
@@ -179,24 +179,7 @@ int create_initial_backup(const char *source, const char *target) {
     return 0;
 }
 
-int is_directory_empty(const char *path) {
-    DIR *dir = opendir(path);
-    if (!dir) {
-        ERR("Failed to open directory");
-    }
-    
-    struct dirent *ent;
-    while ((ent = readdir(dir)) != NULL) {
-        if (strcmp(ent->d_name, ".") != 0 && strcmp(ent->d_name, "..") != 0) {
-            closedir(dir);
-            return 0;
-        }
-    }
-    
-    closedir(dir);
-    return 1;
-}
-
+// addin watches to all subdirectorys
 int add_watch_recursive(int inotify_fd, const char *path) {
     if (register_watch(inotify_fd, path) == -1) {
         return -1;
@@ -244,6 +227,7 @@ int add_watch_recursive(int inotify_fd, const char *path) {
     return 0;
 }
 
+// handlin inotify events, this is where the magic hapens
 void handle_inotify_event(struct inotify_event *event, const char *root_source, const char *root_target, int inotify_fd) {
     if (event->len == 0) {
         if (event->mask & IN_IGNORED) {
@@ -320,7 +304,7 @@ void handle_inotify_event(struct inotify_event *event, const char *root_source, 
                 fprintf(stderr, "Failed to backup directory: %s\n", source_path);
             }
         } else if (S_ISLNK(st.st_mode)) {
-            copy_symlink_smart(source_path, target_path, root_source, root_target);
+            copy_symlink(source_path, target_path, root_source, root_target);
         } else {
             copy_file(source_path, target_path);
         }
@@ -345,6 +329,7 @@ void handle_inotify_event(struct inotify_event *event, const char *root_source, 
     }
 }
 
+// main worker loop, runs in forked proces
 void start_backup_worker(const char *source, const char *target) {
     setup_signal_handlers();
 

@@ -12,6 +12,7 @@
 
 volatile sig_atomic_t should_exit = 0;
 
+// printin help message
 void print_help() {
     fprintf(stdout, "Available commands:\n");
     fprintf(stdout, "  add <source> <target> [<target> ...] - Start backup\n");
@@ -22,6 +23,7 @@ void print_help() {
     fprintf(stdout, "  exit - Exit program\n");
 }
 
+// main function, handlin user input in loop
 int main(int argc, char *argv[]) { 
     const char *home = getenv("HOME");
     if (home) {
@@ -130,6 +132,5 @@ int main(int argc, char *argv[]) {
     
     cleanup_on_exit(manager);
     destroy_backup_manager(manager);
-    unlink("/tmp/sop-backup.state");
     return EXIT_SUCCESS;
 }
