@@ -7,10 +7,12 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include "backup.h"
-#include "utils.h"
+#include <sys/time.h>
 #include <dirent.h>
 #include <limits.h>
+#include "backup.h"
+
+#define ERR(source) (perror(source), fprintf(stderr, "%s:%d\n", __FILE__, __LINE__), exit(EXIT_FAILURE))
 
 #define FILE_BUF_LEN 65536
 
@@ -65,7 +67,8 @@ int copy_file(const char* source_path, const char* dest_path)
         ERR("Failed to open source file");
     }
 
-    unlink(dest_path);
+
+    
 
     const int dest_fd = open(dest_path, O_WRONLY | O_CREAT | O_TRUNC, source_stat.st_mode & 0777);
     if (dest_fd == -1) {
@@ -88,6 +91,14 @@ int copy_file(const char* source_path, const char* dest_path)
 
     close(source_fd);
     close(dest_fd);
+
+    struct timeval times[2];
+    times[0].tv_sec = source_stat.st_atime;
+    times[0].tv_usec = 0;
+    times[1].tv_sec = source_stat.st_mtime;
+    times[1].tv_usec = 0;
+    utimes(dest_path, times);
+
     return EXIT_SUCCESS;
 }
 

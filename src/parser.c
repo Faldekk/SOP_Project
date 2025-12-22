@@ -4,7 +4,6 @@
 #include <string.h>
 #include <ctype.h>
 #include "parser.h"
-#include "utils.h"
 
 static char** tokenize(const char *line, int *count) {
     if (!line || !count) return NULL;

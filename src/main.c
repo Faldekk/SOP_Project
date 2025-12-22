@@ -9,7 +9,6 @@
 #include "signals.h"
 #include "parser.h"
 #include "restore.h"
-#include "utils.h"
 
 volatile sig_atomic_t should_exit = 0;
 

@@ -10,8 +10,9 @@
 #include <dirent.h>
 #include "monitor.h"
 #include "backup.h"
-#include "utils.h"
 #include "signals.h"
+
+#define ERR(source) (perror(source), fprintf(stderr, "%s:%d\n", __FILE__, __LINE__), exit(EXIT_FAILURE))
 
 typedef struct watch_node {
     int wd;

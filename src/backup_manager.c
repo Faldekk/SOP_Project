@@ -6,9 +6,11 @@
 #include <sys/inotify.h>
 #include <sys/wait.h>
 #include <signal.h>
+#include <errno.h>
 #include "backup_manager.h"
 #include "monitor.h"
-#include "utils.h"
+
+#define ERR(source) (perror(source), fprintf(stderr, "%s:%d\n", __FILE__, __LINE__), exit(EXIT_FAILURE))
 
 backup_manager_t* create_backup_manager() {
     backup_manager_t *mgr = calloc(1, sizeof(backup_manager_t));

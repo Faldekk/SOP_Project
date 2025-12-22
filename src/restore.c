@@ -8,7 +8,6 @@
 #include <limits.h>
 #include <errno.h>
 #include "restore.h"
-#include "utils.h"
 
 int compare_and_copy_if_different(const char *src, const char *dst) {
     struct stat st_src, st_dst;
