@@ -67,11 +67,9 @@ int copy_file(const char* source_path, const char* dest_path)
         ERR("Failed to open source file");
     }
 
-
-    
-
     const int dest_fd = open(dest_path, O_WRONLY | O_CREAT | O_TRUNC, source_stat.st_mode & 0777);
     if (dest_fd == -1) {
+        close(source_fd);
         ERR("Failed to create destination file");
     }
 
@@ -79,12 +77,16 @@ int copy_file(const char* source_path, const char* dest_path)
     for (;;) {
         const ssize_t bytes_read = bulk_read(source_fd, buffer, FILE_BUF_LEN);
         if (bytes_read == -1) {
+            close(source_fd);
+            close(dest_fd);
             ERR("Failed to read from source file");
         }
         if (bytes_read == 0) {
             break;
         }
         if (bulk_write(dest_fd, buffer, bytes_read) == -1) {
+            close(source_fd);
+            close(dest_fd);
             ERR("Failed to write to destination file");
         }
     }
@@ -138,12 +140,12 @@ int copy_symlink_smart(const char *path_src, const char *path_dst, const char *s
         free(real_target_base);
         
         if (symlink(link_buf, path_dst) == -1) {
-            perror("symlink");
+            perror("symlink on src not absolute");
             return EXIT_FAILURE;
         }
     } else {
         if (symlink(link_buf, path_dst) == -1) {
-            perror("symlink");
+            perror("symlink on dst not absolute");
             return EXIT_FAILURE;
         }
     }
@@ -190,9 +192,16 @@ int copy_tree(const char* source_path, const char* dest_path, const char* source
     return EXIT_FAILURE;
 }
 int copy_dir(const char* source_path, const char* dest_path, const char* source_base, const char* target_base) {
-    struct stat dest_stat;
+    struct stat src_stat, dest_stat;
+    if (lstat(source_path, &src_stat) == -1) {
+        ERR("Failed to get source directory info");
+    }
 
-    if (mkdir(dest_path, 0755) == -1) {
+    mode_t old_umask = umask(0);
+    int mkdir_result = mkdir(dest_path, src_stat.st_mode & 0777);
+    umask(old_umask);
+    
+    if (mkdir_result == -1) {
         if (errno == EEXIST) {
             if (lstat(dest_path, &dest_stat) == -1) {
                 ERR("Failed to check destination directory");
@@ -219,8 +228,12 @@ int copy_dir(const char* source_path, const char* dest_path, const char* source_
             continue;
         }
 
-        snprintf(child_source, PATH_MAX, "%s/%s", source_path, entry->d_name);
-        snprintf(child_dest, PATH_MAX, "%s/%s", dest_path, entry->d_name);
+        int result_s_path = snprintf(child_source, PATH_MAX, "%s/%s", source_path, entry->d_name);
+        int result_d_path = snprintf(child_dest, PATH_MAX, "%s/%s", dest_path, entry->d_name);
+
+        if (result_s_path < 0 || result_d_path < 0 || result_s_path >= PATH_MAX || result_d_path >= PATH_MAX) {
+            ERR("Failed to format paths");
+        }
         copy_tree(child_source, child_dest, source_base, target_base);
     }
 

@@ -24,7 +24,9 @@ static watch_node_t *watch_list = NULL;
 
 static const char* find_watch_path(int wd) {
     for (watch_node_t *n = watch_list; n; n = n->next) {
-        if (n->wd == wd) return n->path;
+        if (n->wd == wd){
+             return n->path;
+        }
     }
     return NULL;
 }
@@ -307,7 +309,7 @@ void handle_inotify_event(struct inotify_event *event, const char *root_source, 
         }
 
         if (S_ISDIR(st.st_mode)) {
-            if (mkdir(target_path, 0755) == -1 && errno != EEXIST) {
+            if (mkdir(target_path, st.st_mode & 0777) == -1 && errno != EEXIST) {
                 perror("Failed to create backup directory");
                 return;
             }

@@ -136,7 +136,7 @@ int restore_backup(const char *source, const char *target) {
         }
         
         if (S_ISDIR(st.st_mode)) {
-            if (mkdir(source_path, 0755) == -1 && errno != EEXIST) {
+            if (mkdir(source_path, st.st_mode & 0777) == -1 && errno != EEXIST) {
                 perror("mkdir failed");
             }
             restore_backup(source_path, target_path);
