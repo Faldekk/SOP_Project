@@ -3,7 +3,8 @@
 
 #include <sys/types.h>
 
-typedef struct backup_entry {
+typedef struct backup_entry
+{
     char *source_path;
     char *target_path;
     pid_t worker_pid;
@@ -11,12 +12,13 @@ typedef struct backup_entry {
     struct backup_entry *next;
 } backup_entry_t;
 
-typedef struct {
+typedef struct
+{
     backup_entry_t *head;
     int inotify_fd;
 } backup_manager_t;
 
-backup_manager_t* create_backup_manager();
+backup_manager_t *create_backup_manager();
 void destroy_backup_manager(backup_manager_t *mgr);
 
 int add_backup(backup_manager_t *mgr, const char *source, const char *target);

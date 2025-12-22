@@ -1,6 +1,6 @@
 /*
  * signals.h - Deklaracje obsługi sygnałów
- * 
+ *
  * should_exit - Flaga globalna ustawiana przez handler sygnału
  * Funkcje do konfiguracji handlerów i sprzątania przy wyjściu.
  */

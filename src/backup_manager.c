@@ -1,25 +1,27 @@
 #define _GNU_SOURCE
+#include "backup_manager.h"
+#include <errno.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 #include <sys/inotify.h>
 #include <sys/wait.h>
-#include <signal.h>
-#include <errno.h>
-#include "backup_manager.h"
+#include <unistd.h>
 #include "monitor.h"
 
 #define ERR(source) (perror(source), fprintf(stderr, "%s:%d\n", __FILE__, __LINE__), exit(EXIT_FAILURE))
 
 // creatin the manager struct thing
-backup_manager_t* create_backup_manager() {
+backup_manager_t *create_backup_manager()
+{
     backup_manager_t *mgr = calloc(1, sizeof(backup_manager_t));
     if (!mgr)
         return NULL;
 
     mgr->inotify_fd = inotify_init1(IN_NONBLOCK | IN_CLOEXEC);
-    if (mgr->inotify_fd == -1) {
+    if (mgr->inotify_fd == -1)
+    {
         free(mgr);
         return NULL;
     }
@@ -29,12 +31,14 @@ backup_manager_t* create_backup_manager() {
 }
 
 // freein everything, dont forget to call this
-void destroy_backup_manager(backup_manager_t *mgr) {
+void destroy_backup_manager(backup_manager_t *mgr)
+{
     if (!mgr)
         return;
 
     backup_entry_t *cur = mgr->head;
-    while (cur) {
+    while (cur)
+    {
         backup_entry_t *next = cur->next;
         free(cur->source_path);
         free(cur->target_path);
@@ -49,8 +53,10 @@ void destroy_backup_manager(backup_manager_t *mgr) {
 }
 
 // checcs if backup alredy exists in linked list
-static int backup_exists(backup_manager_t *mgr, const char *source, const char *target) {
-    for (backup_entry_t *c = mgr->head; c; c = c->next) {
+static int backup_exists(backup_manager_t *mgr, const char *source, const char *target)
+{
+    for (backup_entry_t *c = mgr->head; c; c = c->next)
+    {
         if (strcmp(c->source_path, source) == 0 && strcmp(c->target_path, target) == 0)
             return 1;
     }
@@ -58,11 +64,13 @@ static int backup_exists(backup_manager_t *mgr, const char *source, const char *
 }
 
 // addin new backup and startin worker proces with fork
-int add_backup(backup_manager_t *mgr, const char *source, const char *target) {
+int add_backup(backup_manager_t *mgr, const char *source, const char *target)
+{
     if (!mgr || !source || !target)
         return -1;
 
-    if (backup_exists(mgr, source, target)) {
+    if (backup_exists(mgr, source, target))
+    {
         fprintf(stderr, "Backup already exists: %s -> %s\n", source, target);
         return -1;
     }
@@ -80,38 +88,47 @@ int add_backup(backup_manager_t *mgr, const char *source, const char *target) {
     mgr->head = entry;
 
     pid_t pid = fork();
-    if (pid == 0) {
+    if (pid == 0)
+    {
         start_backup_worker(source, target);
         exit(EXIT_SUCCESS);
-    } else if (pid > 0) {
+    }
+    else if (pid > 0)
+    {
         entry->worker_pid = pid;
         return 0;
-    } else {
+    }
+    else
+    {
         ERR("fork - backup_manager.c");
         return -1;
     }
 }
 
 // killin worker and removin from list
-int remove_backup(backup_manager_t *mgr, const char *source, const char *target) {
+int remove_backup(backup_manager_t *mgr, const char *source, const char *target)
+{
     if (!mgr || !source || !target)
         return -1;
 
     backup_entry_t *prev = NULL;
     backup_entry_t *cur = mgr->head;
 
-    while (cur) {
-        if (strcmp(cur->source_path, source) == 0 && strcmp(cur->target_path, target) == 0) {
-            if (cur->worker_pid > 0) {
+    while (cur)
+    {
+        if (strcmp(cur->source_path, source) == 0 && strcmp(cur->target_path, target) == 0)
+        {
+            if (cur->worker_pid > 0)
+            {
                 sigset_t set, oldset;
                 sigemptyset(&set);
                 sigaddset(&set, SIGTERM);
                 sigaddset(&set, SIGINT);
                 sigprocmask(SIG_BLOCK, &set, &oldset);
-                
+
                 kill(cur->worker_pid, SIGTERM);
                 waitpid(cur->worker_pid, NULL, 0);
-                
+
                 sigprocmask(SIG_SETMASK, &oldset, NULL);
                 cur->worker_pid = -1;
             }
@@ -138,27 +155,34 @@ int remove_backup(backup_manager_t *mgr, const char *source, const char *target)
 }
 
 // printin all backups
-void list_backups(backup_manager_t *mgr) {
+void list_backups(backup_manager_t *mgr)
+{
     if (!mgr)
         return;
 
-    if (!mgr->head) {
+    if (!mgr->head)
+    {
         printf("No active backups.\n");
         return;
     }
 
     int idx = 1;
-    for (backup_entry_t *c = mgr->head; c; c = c->next) {
+    for (backup_entry_t *c = mgr->head; c; c = c->next)
+    {
         printf("%d. %s -> %s (PID: %d)\n", idx++, c->source_path, c->target_path, c->worker_pid);
     }
 }
 
 // killin all workers when exitin program
-void kill_all_workers(backup_manager_t *mgr) {
-    if (!mgr) return;
+void kill_all_workers(backup_manager_t *mgr)
+{
+    if (!mgr)
+        return;
 
-    for (backup_entry_t *c = mgr->head; c; c = c->next) {
-        if (c->worker_pid > 0) {
+    for (backup_entry_t *c = mgr->head; c; c = c->next)
+    {
+        if (c->worker_pid > 0)
+        {
             kill(c->worker_pid, SIGTERM);
             waitpid(c->worker_pid, NULL, 0);
             c->worker_pid = -1;

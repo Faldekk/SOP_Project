@@ -2,10 +2,11 @@
 #ifndef MONITOR_H
 #define MONITOR_H
 
-#include <sys/types.h>
 #include <sys/inotify.h>
+#include <sys/types.h>
 
-typedef struct {
+typedef struct
+{
     char *source_path;
     char *target_path;
 } backup_paths_t;
