@@ -28,20 +28,6 @@ make
 - Multiple backup targets
 - Signal handling (SIGINT, SIGTERM)
 
-## Architecture
-
-```
-main.c ──────► parser.c ──────► backup_manager.c
-   │                                   │
-   │                                   ▼
-   │                            monitor.c (fork)
-   │                                   │
-   ▼                                   ▼
-signals.c                         backup.c
-                                       │
-                                       ▼
-                                   restore.c
-```
 
 ### Modules
 
@@ -54,7 +40,6 @@ signals.c                         backup.c
 | `backup.c` | File/directory copy operations (bulk read/write) |
 | `restore.c` | Restores backup to original location |
 | `signals.c` | SIGINT/SIGTERM handlers for graceful shutdown |
-| `utils.c` | Helper functions, error macros |
 
 ### How it works
 

@@ -317,6 +317,8 @@ void handle_inotify_event(struct inotify_event *event, const char *root_source, 
             if (copy_tree(source_path, target_path, root_source, root_target) != 0) {
                 fprintf(stderr, "Failed to backup directory: %s\n", source_path);
             }
+        } else if (S_ISLNK(st.st_mode)) {
+            copy_symlink_smart(source_path, target_path, root_source, root_target);
         } else {
             copy_file(source_path, target_path);
         }
