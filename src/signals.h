@@ -1,3 +1,4 @@
+// clang-format off
 /*
  * signals.h - Deklaracje obsługi sygnałów
  *

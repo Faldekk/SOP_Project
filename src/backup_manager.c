@@ -1,3 +1,4 @@
+// clang-format off
 #define _GNU_SOURCE
 #include "backup_manager.h"
 #include <errno.h>

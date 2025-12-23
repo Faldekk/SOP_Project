@@ -1,3 +1,4 @@
+// clang-format off
 #ifndef RESTORE_H
 #define RESTORE_H
 

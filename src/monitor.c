@@ -1,3 +1,4 @@
+// clang-format off
 #define _GNU_SOURCE
 #include "monitor.h"
 #include <dirent.h>
